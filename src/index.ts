@@ -1,9 +1,12 @@
 import * as dat from "dat.gui";
 import Stats from "stats-js";
 import {
+  BoxGeometry,
   BufferGeometry,
   CameraHelper,
+  Clock,
   Matrix4,
+  Mesh,
   PCFSoftShadowMap,
   PerspectiveCamera,
   Points,
@@ -21,7 +24,7 @@ import { PATTERN } from "./GatherMaterial";
 import { CornellBox } from "./CornellBox";
 import { Targets } from "./Targets";
 import { MyLayers } from "./constants";
-import { GatherPass } from "./GatherLowResPass";
+import { GatherPass } from "./GatherPass";
 import { InterpolatePass } from "./InterpolatePass";
 import { BlitToScreen } from "./BlitToScreen";
 
@@ -72,8 +75,6 @@ camera.lookAt(new Vector3(0.5, 0, 0.5));
 
 const controls = new OrbitControls(camera, renderer.domElement);
 
-// scene.add(new AxesHelper(100));
-
 ///=========================================================================================================
 
 const spotLight = new SpotLight("#ffffff", 8);
@@ -99,120 +100,39 @@ uLightProjectionMatrix.value.copy(shadowCamera.projectionMatrix);
 const slHelper = new SpotLightHelper(spotLight);
 scene.add(slHelper);
 
-const scHelper = new CameraHelper(shadowCamera);
-scene.add(scHelper);
+// const scHelper = new CameraHelper(shadowCamera);
+// scene.add(scHelper);
 ///=========================================================================================================
 
-const cornell = new CornellBox(
-  spotLight,
-  LOW_RES,
-  uNormalSimilarityThreshold,
-  uWPSimilarityThreshold,
-  uSearchRadius,
-  uEdgeCorrection,
-  uLightViewMatrix,
-  uLightProjectionMatrix,
-  targets.rsmMRT,
-  targets.lowResGI
-);
+const cornell = new CornellBox(spotLight);
 scene.add(cornell);
 
-const currentTextureOption = {
-  value: "rsmMRT:flux",
-};
-
-const onTextureChange = (v: string) => {
-  console.log(v);
-  switch (v) {
-    case "rsmMRT:flux":
-      return displayMRT.setTexture(targets.rsmMRT.textures[0]);
-    case "rsmMRT:normal":
-      return displayMRT.setTexture(targets.rsmMRT.textures[1]);
-    case "rsmMRT:wp":
-      return displayMRT.setTexture(targets.rsmMRT.textures[2]);
-    case "lowResGBuffer:color":
-      return displayMRT.setTexture(targets.lowResGBuffer.textures[0]);
-    case "lowResGBuffer:normal":
-      return displayMRT.setTexture(targets.lowResGBuffer.textures[1]);
-    case "lowResGBuffer:wp":
-      return displayMRT.setTexture(targets.lowResGBuffer.textures[2]);
-    case "lowResGI":
-      return displayMRT.setTexture(targets.lowResGI.texture);
-    case "mainGBuffer:color":
-      return displayMRT.setTexture(targets.mainGBuffer.textures[0]);
-    case "mainGBuffer:normal":
-      return displayMRT.setTexture(targets.mainGBuffer.textures[1]);
-    case "mainGBuffer:wp":
-      return displayMRT.setTexture(targets.mainGBuffer.textures[2]);
-  }
-};
-gui
-  .add(currentTextureOption, "value", [
-    "rsmMRT:flux",
-    "rsmMRT:normal",
-    "rsmMRT:wp",
-    "lowResGBuffer:color",
-    "lowResGBuffer:normal",
-    "lowResGBuffer:wp",
-    "lowResGI",
-    "mainGBuffer:color",
-    "mainGBuffer:normal",
-    "mainGBuffer:wp",
-  ])
-  .onChange(onTextureChange)
-  .name("target");
-
 const displayMRT = new DisplayMRT(targets.rsmMRT.textures[0]);
-onTextureChange(currentTextureOption.value);
 scene.add(displayMRT);
 
 ///=========================================================================================================
-const points = new Points(
-  new BufferGeometry().setFromPoints(PATTERN),
-  new ShaderMaterial({
-    vertexShader: `
-      void main (){
-        gl_PointSize = 32.*position.z+5.;
-        gl_Position.xy = position.xy * 0.5;
-        gl_Position.z=0.;
-        gl_Position.w=1.;
-      }
-  `,
-    fragmentShader: `
-      void main(){
-        gl_FragColor = vec4(1.,0.,0,1.);
-      }
-  `,
-  })
-);
-points.renderOrder = 5;
-points.frustumCulled = false;
+// const points = new Points(
+//   new BufferGeometry().setFromPoints(PATTERN),
+//   new ShaderMaterial({
+//     vertexShader: `
+//       void main (){
+//         gl_PointSize = 32.*position.z+5.;
+//         gl_Position.xy = position.xy * 0.5;
+//         gl_Position.z=0.;
+//         gl_Position.w=1.;
+//       }
+//   `,
+//     fragmentShader: `
+//       void main(){
+//         gl_FragColor = vec4(1.,0.,0,1.);
+//       }
+//   `,
+//   })
+// );
+// points.renderOrder = 5;
+// points.frustumCulled = false;
 // scene.add(points);
 ///=========================================================================================================
-
-const options = {
-  showHelper: false,
-};
-const showHelpers = (v: boolean) => {
-  slHelper.visible = v;
-  scHelper.visible = v;
-};
-showHelpers(options.showHelper);
-
-gui.add(uSearchRadius, "value", 0, 1).step(0.01).name("search radius");
-gui.add(uEdgeCorrection, "value", 0, 1).step(0.01).name("edge f");
-gui.add(uNormalSimilarityThreshold, "value", 0, 1).step(0.01).name("normal f");
-gui.add(uWPSimilarityThreshold, "value", 0, 1).step(0.01).name("wp f");
-gui.add(options, "showHelper").onChange(showHelpers);
-
-///=========================================================================================================
-
-//render once into rsm target
-shadowCamera.layers.set(MyLayers.RSM);
-
-renderer.setRenderTarget(targets.rsmMRT);
-renderer.render(scene, shadowCamera);
-renderer.setRenderTarget(null);
 
 const gatherPassLowRes = new GatherPass(
   LOW_RES,
@@ -243,8 +163,95 @@ const interpolatePass = new InterpolatePass(
   LOW_RES
 );
 const blitPass = new BlitToScreen(targets.composition.texture);
+///=========================================================================================================
+
+const options = {
+  showHelper: false,
+  showInterpolation: false,
+  targetTexture: "rsmMRT:flux",
+};
+const showHelpers = (v: boolean) => {
+  slHelper.visible = v;
+  // scHelper.visible = v;
+};
+const targetNames = [
+  "rsmMRT:flux",
+  "rsmMRT:normal",
+  "rsmMRT:wp",
+  "lowResGBuffer:color",
+  "lowResGBuffer:normal",
+  "lowResGBuffer:wp",
+  "lowResGI",
+  "mainGBuffer:color",
+  "mainGBuffer:normal",
+  "mainGBuffer:wp",
+];
+const onTextureChange = (v: string) => {
+  switch (v) {
+    case "rsmMRT:flux":
+      return displayMRT.setTexture(targets.rsmMRT.textures[0]);
+    case "rsmMRT:normal":
+      return displayMRT.setTexture(targets.rsmMRT.textures[1]);
+    case "rsmMRT:wp":
+      return displayMRT.setTexture(targets.rsmMRT.textures[2]);
+    case "lowResGBuffer:color":
+      return displayMRT.setTexture(targets.lowResGBuffer.textures[0]);
+    case "lowResGBuffer:normal":
+      return displayMRT.setTexture(targets.lowResGBuffer.textures[1]);
+    case "lowResGBuffer:wp":
+      return displayMRT.setTexture(targets.lowResGBuffer.textures[2]);
+    case "lowResGI":
+      return displayMRT.setTexture(targets.lowResGI.texture);
+    case "mainGBuffer:color":
+      return displayMRT.setTexture(targets.mainGBuffer.textures[0]);
+    case "mainGBuffer:normal":
+      return displayMRT.setTexture(targets.mainGBuffer.textures[1]);
+    case "mainGBuffer:wp":
+      return displayMRT.setTexture(targets.mainGBuffer.textures[2]);
+  }
+};
+
+gui.add(uSearchRadius, "value", 0, 1).step(0.01).name("search radius");
+gui.add(uEdgeCorrection, "value", 0, 1).step(0.01).name("edge f");
+gui.add(uNormalSimilarityThreshold, "value", 0, 1).step(0.01).name("normal f");
+gui.add(uWPSimilarityThreshold, "value", 0, 1).step(0.01).name("wp f");
+gui.add(options, "showHelper").onChange(showHelpers);
+gui
+  .add(options, "showInterpolation")
+  .onChange(gatherPassFinal.setShowInterpolation);
+gui
+  .add(options, "targetTexture", targetNames)
+  .onChange(onTextureChange)
+  .name("target");
+
+showHelpers(options.showHelper);
+onTextureChange(options.targetTexture);
+///=========================================================================================================
+
+const clock = new Clock();
+let angle = 0;
 function animation() {
   stats.begin();
+
+  const delta = clock.getDelta();
+
+  angle += delta * 0.4;
+
+  let anglePhase = Math.cos(angle) * Math.PI;
+  anglePhase /= 8;
+  anglePhase += Math.PI / 4;
+  const lx = Math.cos(anglePhase);
+  const ly = Math.sin(anglePhase);
+
+  const r = 1.5 * 1.5;
+
+  spotLight.position.set(lx * r, 1 + Math.cos(angle * 1.3) * 0.2, ly * r);
+  spotLight.lookAt(0, 0, 0);
+
+  shadowCamera.layers.set(MyLayers.RSM);
+  renderer.setRenderTarget(targets.rsmMRT);
+  renderer.clear();
+  renderer.render(scene, shadowCamera);
 
   //render standard materials eligible for effect into low res g buffer
   camera.layers.set(MyLayers.StandardGBuffer);
@@ -286,3 +293,13 @@ const onResize = () => {
 };
 window.addEventListener("resize", onResize);
 onResize();
+
+const remap = (
+  v: number,
+  sourceMin: number,
+  sourceMax: number,
+  targetMin: number,
+  targetMax: number
+) =>
+  targetMin +
+  (targetMax - targetMin) * ((v - sourceMin) / (sourceMax - sourceMin));

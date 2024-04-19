@@ -11,6 +11,7 @@ import { GatherMaterialScreen } from "./GatherMaterial";
 
 export class GatherPass extends Scene {
   public camera = new PerspectiveCamera();
+  private _material: GatherMaterialScreen;
   constructor(
     lowResSize: number,
     rsmTarget: WebGLRenderTarget,
@@ -24,20 +25,21 @@ export class GatherPass extends Scene {
     super();
 
     const geometry = new PlaneGeometry(2, 2, 1, 1);
-    const mesh = new Mesh(
-      geometry,
-      new GatherMaterialScreen(
-        lowResSize,
-        uLightViewMatrix,
-        uLightProjectionMatrix,
-        rsmTarget,
-        lowResGBuffer,
-        uSearchRadius,
-        uEdgeCorrection,
-        isFullScreen
-      )
-    );
+    const material = (this._material = new GatherMaterialScreen(
+      lowResSize,
+      uLightViewMatrix,
+      uLightProjectionMatrix,
+      rsmTarget,
+      lowResGBuffer,
+      uSearchRadius,
+      uEdgeCorrection,
+      isFullScreen
+    ));
+    const mesh = new Mesh(geometry, material);
     mesh.frustumCulled = false;
     this.add(mesh);
   }
+  setShowInterpolation = (v: boolean) => {
+    this._material.showInterpolation = v;
+  };
 }

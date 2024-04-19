@@ -40,6 +40,7 @@ uniform mat4 uLightProjectionMatrix;
 uniform float uLowResSize;
 
 uniform bool uIsFullScreen;
+uniform bool uShowInterpolation;
 
 void main () { 
   //get cell centers for low res screen space
@@ -97,6 +98,9 @@ void main () {
 
   if(uIsFullScreen){
     outColor.xyz += texture2D(uGBufferColor,vUv).xyz;
+    if(uShowInterpolation){
+      outColor.xyz = mix(outColor.xyz, vec3(1.,0.,0.),0.3);
+    }
   }
 }
 `;
@@ -143,6 +147,7 @@ export class GatherMaterialScreen extends ShaderMaterial {
         uGBufferColor: { value: gColor },
         uGBufferNormal: { value: gNormal },
         uGBufferWorldPos: { value: gWorldPos },
+        uShowInterpolation: { value: false },
         uPattern: { value: PATTERN },
         uIsFullScreen: { value: isSecondPass },
         uLightViewMatrix,
@@ -163,6 +168,12 @@ export class GatherMaterialScreen extends ShaderMaterial {
   }
   set radius(v: number) {
     this.uniforms.uSearchRadius.value = v;
+  }
+  get showInterpolation(): boolean {
+    return this.uniforms.uShowInterpolation.value;
+  }
+  set showInterpolation(v: boolean) {
+    this.uniforms.uShowInterpolation.value = v;
   }
 }
 

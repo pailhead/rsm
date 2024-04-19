@@ -14,18 +14,7 @@ import { StandardMRTStencilMaterial } from "./StandardMRTStencilMaterial";
 import { MyLayers } from "./constants";
 
 export class CornellBox extends Object3D {
-  constructor(
-    spotLight: SpotLight,
-    interpolationResolution: number,
-    uNormalSimilarityThreshold: { value: number },
-    uWPSimilarityThreshold: { value: number },
-    uSearchRadius: { value: number },
-    uEdgeCorrection: { value: number },
-    uLightViewMatrix: { value: Matrix4 },
-    uLightProjectionMatrix: { value: Matrix4 },
-    rsmTarget: WebGLRenderTarget,
-    lowResTarget: WebGLRenderTarget
-  ) {
+  constructor(spotLight: SpotLight) {
     super();
 
     const planeGeometry = new PlaneGeometry(1, 1, 1, 1);
@@ -38,16 +27,6 @@ export class CornellBox extends Object3D {
         new StandardMRTStencilMaterial(color)
       );
       meshMainGBuffer.layers.set(MyLayers.StandardGBuffer);
-      // const mesh = new Mesh(
-      //   geometry,
-      //   new InterpolateMaterial(
-      //     color,
-      //     lowResTarget,
-      //     uNormalSimilarityThreshold,
-      //     uWPSimilarityThreshold,
-      //     interpolationResolution
-      //   )
-      // );
 
       const meshRSMGBufer = new Mesh(
         geometry,
@@ -55,32 +34,6 @@ export class CornellBox extends Object3D {
       );
       meshRSMGBufer.layers.set(MyLayers.RSM);
 
-      // const meshGather = new Mesh(
-      //   geometry,
-      //   new GatherMaterialScreen(
-      //     uLightViewMatrix,
-      //     uLightProjectionMatrix,
-      //     rsmTarget,
-      //     uSearchRadius,
-      //     uEdgeCorrection
-      //   )
-      // );
-      // meshGather.layers.set(2);
-
-      // const meshGather2 = new Mesh(
-      //   geometry,
-      //   new GatherMaterial(
-      //     uLightViewMatrix,
-      //     uLightProjectionMatrix,
-      //     renderTarget.textures[0],
-      //     renderTarget.textures[1],
-      //     renderTarget.textures[2],
-      //     uSearchRadius,
-      //     uEdgeCorrection,
-      //     true
-      //   )
-      // );
-      // meshGather2.layers.set(3);
       const obj = new Object3D();
       obj.add(meshMainGBuffer, meshRSMGBufer);
       return obj;
